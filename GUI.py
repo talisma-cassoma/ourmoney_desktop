@@ -30,41 +30,50 @@ Total_font.setBold(True)  # Make the text bold
 from PyQt5.QtCore import QThread, pyqtSignal
 
 def create_checkbox_menu_button(title, options, selected_options_set):
-    """
-    Cria um botão com menu suspenso contendo checkboxes.
-    
-    :param title: Título do botão principal.
-    :param options: Lista de strings (opções).
-    :param callback: Função chamada quando checkbox é clicado.
-    :param selected_options_set: Set externo compartilhado para controle de seleção.
-    :return: QPushButton
-    """
     button = QPushButton(title)
-    button.setStyleSheet("background-color: #333; font-size: 12px; color: white;")
+    button.setStyleSheet(
+        "background-color: #333; font-size: 12px; color: white;"
+    )
     button.setCursor(Qt.PointingHandCursor)
 
     menu = QMenu()
-    menu.setStyleSheet("""
-        QMenu {
-            color: white;
-            border: 1px solid rgb(41, 41, 46);
-            padding: 4px;
-        }
-        QMenu::item {
-            padding: 4px 10px;
-            color: white;          
-        }
-    """)
+    # menu.setStyleSheet("""
+    #         QMenu {
+    #             background-color: #333;
+    #             color: white
+    #         }
+    #     """)
 
     for option in options:
-        checkbox = QCheckBox(option)
-        checkbox.setChecked(option in selected_options_set)
+        if isinstance(option, tuple):
+            value, label = option
+        else:
+            value = label = option
 
-        def toggle_option(checked, opt=option):
+        checkbox = QCheckBox(label)
+
+        # Define o padding interno e a margin externa do checkbox
+        checkbox.setStyleSheet("""
+            QCheckBox {
+                padding: 6px 12px;  /* Espaçamento interno (cima/baixo, esquerda/direita) */
+                margin: 2px 4px;    /* Distância entre um checkbox e outro */
+                /* color: white */
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+        """)
+
+        checkbox.setChecked(
+            value in selected_options_set
+        )
+
+        def toggle_option(checked, option_value=value):
             if checked:
-                selected_options_set.add(opt)
+                selected_options_set.add(option_value)
             else:
-                selected_options_set.discard(opt)
+                selected_options_set.discard(option_value)
 
         checkbox.stateChanged.connect(toggle_option)
 
@@ -73,7 +82,19 @@ def create_checkbox_menu_button(title, options, selected_options_set):
         menu.addAction(action)
 
     button.setMenu(menu)
+
     return button
+
+
+def reset_checkbox_menu(button):
+    if not button or not button.menu():
+        return
+
+    for action in button.menu().actions():
+        widget = action.defaultWidget()
+        if isinstance(widget, QCheckBox):
+            widget.setChecked(False)
+
 
 class StatusCheckerThread(QThread):
     status_signal = pyqtSignal(bool)  # Signal to emit the online status
@@ -134,6 +155,7 @@ class MainWindow(QMainWindow):
             "start_date": None,
             "end_date": None,
         }
+        self.filter_buttons = {}
 
     def set_controller(self, controller):
         """Define o controlador para a GUI."""
@@ -391,36 +413,52 @@ class MainWindow(QMainWindow):
         fl.setSpacing(10)
 
         # Filtros fixos por categoria
-        category_btn = create_checkbox_menu_button(
+        category_options = self.controller.get_filter_options("category")
+        self.category_filter_button = create_checkbox_menu_button(
               title="categoria",
-              options=["alimentaçao e casa", "internet", "saude", "bebida", "emprestimo", "divida", "roupas e calçados", "transporte", "gas"], 
-                selected_options_set= self.filters["category"])
+              options=category_options,
+              selected_options_set=self.filters["category"])
 
-        
-        fl.addWidget(category_btn)
+        self.filter_buttons["category"] = self.category_filter_button
+        fl.addWidget(self.category_filter_button)
 
         # Filtro de status
-        status_button = create_checkbox_menu_button(
-            title="status", 
-            options=["sincronizado", "dessincronizado"], 
-            selected_options_set = self.filters["status"]
+        self.status_filter_button = create_checkbox_menu_button(
+            title="status",
+            options=[
+                ("sincronizado", "sincronizado"),
+                ("dessincronizado", "dessincronizado"),
+            ],
+            selected_options_set=self.filters["status"]
         )
-        fl.addWidget(status_button)
+        self.filter_buttons["status"] = self.status_filter_button
+        fl.addWidget(self.status_filter_button)
 
         #Filtro de tipo
-        type_filter_button = create_checkbox_menu_button(
-            title="tipo", 
-            options=["entrada","saida"], 
-            selected_options_set = self.filters["type"]
+        type_labels = {
+            "income": "entrada",
+            "outcome": "saida",
+        }
+        types_ops = self.controller.get_filter_options("type")
+
+        type_options = [
+            (value, type_labels.get(value, value))
+            for value in types_ops
+        ]
+        self.type_filter_button = create_checkbox_menu_button(
+            title="tipo",
+            options=type_options,
+            selected_options_set=self.filters["type"]
             )
-                
-        fl.addWidget(type_filter_button)
+        self.filter_buttons["type"] = self.type_filter_button
+
+        fl.addWidget(self.type_filter_button)
 
         #Filter start date
         self.start_date_input = QDateEdit()
         self.start_date_input.setCalendarPopup(True)
         self.start_date_input.setDisplayFormat("dd-MM-yyyy")
-        self.start_date_input.setDate(QDate.fromString(today, "dd-MM-yyyy"))
+        self.start_date_input.setDate(QDate.fromString("01-01-2022", "dd-MM-yyyy"))
 
         fl.addWidget(QLabel("De:"))
         fl.addWidget(self.start_date_input)
@@ -434,7 +472,11 @@ class MainWindow(QMainWindow):
         fl.addWidget(QLabel("Até:"))
         fl.addWidget(self.end_date_input)
 
-       
+        self.clear_filter_button = QPushButton(text="Limpar")
+        self.clear_filter_button.clicked.connect(self.clear_filters)
+
+        fl.addWidget(self.clear_filter_button)
+
         self.main_layout.addWidget(self.filter_frame)
 
         # Block 3: List of registered transactions using QTableWidget
@@ -819,6 +861,34 @@ class MainWindow(QMainWindow):
         self.filters["end_date"] = end_date
 
         return True
+
+    def clear_filters(self):
+        self.filters.update({
+            "keyword": "",
+            "category": set(),
+            "type": set(),
+            "status": set(),
+            "start_date": None,
+            "end_date": None,
+        })
+
+        self.search_input.clear()
+        self.start_date_input.setDate(QDate.fromString("01-01-2022", "dd-MM-yyyy"))
+        self.end_date_input.setDate(QDate.fromString(datetime.today().strftime("%d-%m-%Y"), "dd-MM-yyyy"))
+
+        for button in self.filter_buttons.values():
+            reset_checkbox_menu(button)
+
+        self.last_date = None
+
+        if self.controller is not None:
+            self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
+            formatted_income = f"{self.total_of_income:,.2f}".replace(",", " ")
+            formatted_outcome = f"{self.total_of_outcome:,.2f}".replace(",", " ")
+            self.income_label.setText(f"Entradas: {formatted_income} DH$")
+            self.expense_label.setText(f"Saídas: {formatted_outcome} DH$")
+
+        self.load_collection()
 
     def update_keyword_filter(self): 
         self.last_date = None

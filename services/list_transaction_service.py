@@ -60,3 +60,6 @@ class ListTransactions:
             return self._repository.get_total()
         return self._repository.get_total(filters)
     
+    def get_filter_options(self, column: str) -> list[str]:
+        return self._repository.get_filter_options(column)
+    

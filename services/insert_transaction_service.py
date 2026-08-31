@@ -39,3 +39,5 @@ class InsertTransactionService:
         ]
 
         self._repository.insert_many(transactions_entity)
+
+    

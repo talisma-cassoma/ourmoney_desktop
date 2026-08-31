@@ -147,6 +147,9 @@ class Controller:
             )
         self._update.one(transaction_dto)
         
+    def get_filter_options(self, column: str):
+        return self._transactions.get_filter_options(column)
+
     def _normalize_filters_for_query(self, filters=None):
         if filters is None:
             return None

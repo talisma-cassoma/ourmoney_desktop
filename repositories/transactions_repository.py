@@ -194,6 +194,29 @@ class TransactionsRepository:
 
         return [TransactionEntity(*t) for t in transactions]
 
+    def get_filter_options(self, column: str) -> list[str]:
+        allowed_columns = {
+            "category",
+            "type",
+            "status",
+        }
+
+        if column not in allowed_columns:
+            raise ValueError(f"Invalid column: {column}")
+
+        query = f"""
+            SELECT DISTINCT {column}
+            FROM Transactions
+            WHERE status != 'deleted'
+              AND {column} IS NOT NULL
+              AND {column} != ''
+            ORDER BY {column} ASC
+        """
+
+        with self._connect() as conn:
+            cursor = conn.execute(query)
+            return [row[0] for row in cursor.fetchall()]
+
     def get_total(self, filters=None):
         query = """
             SELECT
@@ -202,9 +225,9 @@ class TransactionsRepository:
             FROM Transactions
             WHERE status != 'deleted'
         """
-    
+
         params = []
-    
+
         if filters:
             if filters.get("keyword"):
                 query += """
@@ -214,10 +237,10 @@ class TransactionsRepository:
                         OR CAST(price AS TEXT) LIKE ?
                     )
                 """
-    
+
                 keyword = f"%{filters['keyword']}%"
                 params.extend([keyword, keyword, keyword])
-    
+
             if filters.get("category"):
                 query += (
                     " AND ("
@@ -226,11 +249,11 @@ class TransactionsRepository:
                     )
                     + ")"
                 )
-    
+
                 params.extend(
                     [f"%{value}%" for value in filters["category"]]
                 )
-    
+
             if filters.get("type"):
                 query += (
                     " AND ("
@@ -239,11 +262,11 @@ class TransactionsRepository:
                     )
                     + ")"
                 )
-    
+
                 params.extend(
                     [f"%{value}%" for value in filters["type"]]
                 )
-    
+
             if filters.get("status"):
                 query += (
                     " AND ("
@@ -252,28 +275,28 @@ class TransactionsRepository:
                     )
                     + ")"
                 )
-    
+
                 params.extend(
                     [f"%{value}%" for value in filters["status"]]
                 )
-    
+
             if filters.get("start_date"):
                 query += " AND createdAt >= ?"
                 params.append(filters["start_date"])
-    
+
             if filters.get("end_date"):
                 query += " AND createdAt < ?"
                 params.append(filters["end_date"])
-    
+
         with self._connect() as conn:
             cur = conn.execute(query, params)
             row = cur.fetchone()
-    
+
             self.total_income = row[0]
             self.total_outcome = row[1]
-    
+
             return self.total_income, self.total_outcome
-    
+
     #delete methods
     def delete_many(self, transaction_ids: list[str]):
         """
