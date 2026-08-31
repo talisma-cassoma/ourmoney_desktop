@@ -887,14 +887,12 @@ class MainWindow(QMainWindow):
         self.load_collection()
 
     def clear_filters(self):
-        self.filters.update({
-            "keyword": "",
-            "category": set(),
-            "type": set(),
-            "status": set(),
-            "start_date": None,
-            "end_date": None,
-        })
+        self.filters["keyword"] = ""
+        self.filters["category"].clear()
+        self.filters["type"].clear()
+        self.filters["status"].clear()
+        self.filters["start_date"] = None
+        self.filters["end_date"] = None
 
         self.search_input.clear()
         self.start_date_input.setDate(QDate.fromString("01-01-2022", "dd-MM-yyyy"))
