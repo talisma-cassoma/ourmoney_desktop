@@ -29,7 +29,7 @@ Total_font.setBold(True)  # Make the text bold
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-def create_checkbox_menu_button(title, options, selected_options_set):
+def create_checkbox_menu_button(title, options, selected_options_set, on_change=None):
     button = QPushButton(title)
     button.setStyleSheet(
         "background-color: #333; font-size: 12px; color: white;"
@@ -74,6 +74,9 @@ def create_checkbox_menu_button(title, options, selected_options_set):
                 selected_options_set.add(option_value)
             else:
                 selected_options_set.discard(option_value)
+
+            if on_change is not None:
+                on_change()
 
         checkbox.stateChanged.connect(toggle_option)
 
@@ -417,7 +420,8 @@ class MainWindow(QMainWindow):
         self.category_filter_button = create_checkbox_menu_button(
               title="categoria",
               options=category_options,
-              selected_options_set=self.filters["category"])
+              selected_options_set=self.filters["category"],
+              on_change=self.apply_active_filters)
 
         self.filter_buttons["category"] = self.category_filter_button
         fl.addWidget(self.category_filter_button)
@@ -429,7 +433,8 @@ class MainWindow(QMainWindow):
                 ("sincronizado", "sincronizado"),
                 ("dessincronizado", "dessincronizado"),
             ],
-            selected_options_set=self.filters["status"]
+            selected_options_set=self.filters["status"],
+            on_change=self.apply_active_filters
         )
         self.filter_buttons["status"] = self.status_filter_button
         fl.addWidget(self.status_filter_button)
@@ -448,7 +453,8 @@ class MainWindow(QMainWindow):
         self.type_filter_button = create_checkbox_menu_button(
             title="tipo",
             options=type_options,
-            selected_options_set=self.filters["type"]
+            selected_options_set=self.filters["type"],
+            on_change=self.apply_active_filters
             )
         self.filter_buttons["type"] = self.type_filter_button
 
@@ -862,6 +868,24 @@ class MainWindow(QMainWindow):
 
         return True
 
+    def apply_active_filters(self):
+        self.last_date = None
+
+        if self.start_date_input and self.end_date_input:
+            if not self.update_date_filters():
+                return
+
+        self.filters["keyword"] = self.search_input.text().strip().lower()
+
+        if self.controller is not None:
+            self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
+            formatted_income = f"{self.total_of_income:,.2f}".replace(",", " ")
+            formatted_outcome = f"{self.total_of_outcome:,.2f}".replace(",", " ")
+            self.income_label.setText(f"Entradas: {formatted_income} DH$")
+            self.expense_label.setText(f"Saídas: {formatted_outcome} DH$")
+
+        self.load_collection()
+
     def clear_filters(self):
         self.filters.update({
             "keyword": "",
@@ -879,16 +903,7 @@ class MainWindow(QMainWindow):
         for button in self.filter_buttons.values():
             reset_checkbox_menu(button)
 
-        self.last_date = None
-
-        if self.controller is not None:
-            self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
-            formatted_income = f"{self.total_of_income:,.2f}".replace(",", " ")
-            formatted_outcome = f"{self.total_of_outcome:,.2f}".replace(",", " ")
-            self.income_label.setText(f"Entradas: {formatted_income} DH$")
-            self.expense_label.setText(f"Saídas: {formatted_outcome} DH$")
-
-        self.load_collection()
+        self.apply_active_filters()
 
     def update_keyword_filter(self): 
         self.last_date = None
