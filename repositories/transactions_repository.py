@@ -14,6 +14,31 @@ class TransactionsRepository:
         self.create_table()
         self.total_income , self.total_outcome = self.get_total()
 
+    @staticmethod
+    def _normalize_filter_values(values, aliases):
+        if not values:
+            return []
+
+        normalized = set()
+        for value in values:
+            if value is None:
+                continue
+
+            raw = str(value).strip()
+            if not raw:
+                continue
+
+            normalized.add(raw)
+
+            key = raw.lower()
+            if key in aliases:
+                normalized.add(aliases[key])
+
+            if raw in aliases:
+                normalized.add(aliases[raw])
+
+        return list(normalized)
+
     def _connect(self):
         return sqlite3.connect(self._db_path)
 
@@ -245,40 +270,49 @@ class TransactionsRepository:
                 query += (
                     " AND ("
                     + " OR ".join(
-                        ["category LIKE ?"] * len(filters["category"])
+                        ["category = ?"] * len(filters["category"])
                     )
                     + ")"
                 )
 
-                params.extend(
-                    [f"%{value}%" for value in filters["category"]]
-                )
+                params.extend(filters["category"])
 
             if filters.get("type"):
-                query += (
-                    " AND ("
-                    + " OR ".join(
-                        ["type LIKE ?"] * len(filters["type"])
+                type_aliases = {
+                    "income": "income",
+                    "entrada": "income",
+                    "outcome": "outcome",
+                    "saida": "outcome",
+                }
+                normalized_types = self._normalize_filter_values(filters["type"], type_aliases)
+                if normalized_types:
+                    query += (
+                        " AND ("
+                        + " OR ".join(
+                            ["type = ?"] * len(normalized_types)
+                        )
+                        + ")"
                     )
-                    + ")"
-                )
-
-                params.extend(
-                    [f"%{value}%" for value in filters["type"]]
-                )
+                    params.extend(normalized_types)
 
             if filters.get("status"):
-                query += (
-                    " AND ("
-                    + " OR ".join(
-                        ["status LIKE ?"] * len(filters["status"])
+                status_aliases = {
+                    "synced": "synced",
+                    "sincronizado": "synced",
+                    "unsynced": "unsynced",
+                    "desincronizado": "unsynced",
+                    "dessincronizado": "unsynced",
+                }
+                normalized_status = self._normalize_filter_values(filters["status"], status_aliases)
+                if normalized_status:
+                    query += (
+                        " AND ("
+                        + " OR ".join(
+                            ["status = ?"] * len(normalized_status)
+                        )
+                        + ")"
                     )
-                    + ")"
-                )
-
-                params.extend(
-                    [f"%{value}%" for value in filters["status"]]
-                )
+                    params.extend(normalized_status)
 
             if filters.get("start_date"):
                 query += " AND createdAt >= ?"
@@ -449,52 +483,57 @@ class TransactionsRepository:
             query += (
                 " AND ("
                 + " OR ".join(
-                    ["category LIKE ?"] * len(filters["category"])
+                    ["category = ?"] * len(filters["category"])
                 )
                 + ")"
             )
-    
-            params.extend(
-                [f"%{value}%" for value in filters["category"]]
-            )
-    
+
+            params.extend(filters["category"])
+
         # --------------------------------
         # Type
         # --------------------------------
-    
+
         if filters.get("type"):
-            query += (
-                " AND ("
-                + " OR ".join(
-                    ["type LIKE ?"] * len(filters["type"])
+            type_aliases = {
+                "income": "income",
+                "entrada": "income",
+                "outcome": "outcome",
+                "saida": "outcome",
+            }
+            normalized_types = self._normalize_filter_values(filters["type"], type_aliases)
+            if normalized_types:
+                query += (
+                    " AND ("
+                    + " OR ".join(
+                        ["type = ?"] * len(normalized_types)
+                    )
+                    + ")"
                 )
-                + ")"
-            )
-    
-            params.extend(
-                [f"%{value}%" for value in filters["type"]]
-            )
-    
+                params.extend(normalized_types)
+
         # --------------------------------
         # Status
         # --------------------------------
-    
+
         if filters.get("status"):
-            query += (
-                " AND ("
-                + " OR ".join(
-                    ["status LIKE ?"] * len(filters["status"])
+            status_aliases = {
+                "synced": "synced",
+                "sincronizado": "synced",
+                "unsynced": "unsynced",
+                "desincronizado": "unsynced",
+                "dessincronizado": "unsynced",
+            }
+            normalized_status = self._normalize_filter_values(filters["status"], status_aliases)
+            if normalized_status:
+                query += (
+                    " AND ("
+                    + " OR ".join(
+                        ["status = ?"] * len(normalized_status)
+                    )
+                    + ")"
                 )
-                + ")"
-            )
-    
-            params.extend(
-                [f"%{value}%" for value in filters["status"]]
-            )
-    
-        # --------------------------------
-        # Período
-        # --------------------------------
+                params.extend(normalized_status)
     
         if filters.get("start_date"):
             query += " AND createdAt >= ?"

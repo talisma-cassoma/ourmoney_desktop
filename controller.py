@@ -72,29 +72,35 @@ class Controller:
         "setempbro": "09", "outubro": "10", "novembro": "11", "dezembro": "12"}
         # Conversão de status
         status_map = {
+            "synced": "synced",
             "sincronizado": "synced",
-            "dessincronizado": "unsynced"
-            }
-        type_map={
-            "entrada": "income",
-            "saida": "outcome"
+            "unsynced": "unsynced",
+            "desincronizado": "unsynced",
+            "dessincronizado": "unsynced",
         }
+        type_map = {
+            "income": "income",
+            "entrada": "income",
+            "outcome": "outcome",
+            "saida": "outcome",
+        }
+
         parsed_filters = {
             "keyword": filters["keyword"].strip().lower() if filters["keyword"] else None,
             "category": list(filters["category"]) if filters["category"] else None,
             "type": [type_map[t] for t in filters["type"] if t in type_map] if filters["type"] else None,
             "status": [status_map[s] for s in filters["status"] if s in status_map] if filters["status"] else None,
-             "start_date": (
+            "start_date": (
                 filters["start_date"].toString("yyyy-MM-dd")
                 if filters.get("start_date")
                 else None
-                ),
+            ),
             "end_date": (
                 filters["end_date"].toString("yyyy-MM-dd")
                 if filters.get("end_date")
                 else None
-                ),
-            }
+            ),
+        }
       
         transactions = self._transactions.fetch(last_date=last_date, filters=parsed_filters)
         
@@ -155,12 +161,17 @@ class Controller:
             return None
 
         type_map = {
+            "income": "income",
             "entrada": "income",
-            "saida": "outcome"
+            "outcome": "outcome",
+            "saida": "outcome",
         }
         status_map = {
+            "synced": "synced",
             "sincronizado": "synced",
-            "dessincronizado": "unsynced"
+            "unsynced": "unsynced",
+            "desincronizado": "unsynced",
+            "dessincronizado": "unsynced",
         }
 
         normalized = {
