@@ -84,8 +84,16 @@ class Controller:
             "category": list(filters["category"]) if filters["category"] else None,
             "type": [type_map[t] for t in filters["type"] if t in type_map] if filters["type"] else None,
             "status": [status_map[s] for s in filters["status"] if s in status_map] if filters["status"] else None,
-            "year": list(filters["year"]) if filters["year"] else None,
-            "month": [month_map[m] for m in filters["month"] if m in month_map] if filters["month"] else None
+             "start_date": (
+                filters["start_date"].toString("yyyy-MM-dd")
+                if filters.get("start_date")
+                else None
+                ),
+            "end_date": (
+                filters["end_date"].toString("yyyy-MM-dd")
+                if filters.get("end_date")
+                else None
+                ),
             }
       
         transactions = self._transactions.fetch(last_date=last_date, filters=parsed_filters)
@@ -139,8 +147,39 @@ class Controller:
             )
         self._update.one(transaction_dto)
         
-    def get_total_of_transactions(self):
-         total_income, total_outcome = self._transactions.total()
+    def _normalize_filters_for_query(self, filters=None):
+        if filters is None:
+            return None
+
+        type_map = {
+            "entrada": "income",
+            "saida": "outcome"
+        }
+        status_map = {
+            "sincronizado": "synced",
+            "dessincronizado": "unsynced"
+        }
+
+        normalized = {
+            "keyword": filters.get("keyword", "").strip().lower() if filters.get("keyword") else None,
+            "category": list(filters.get("category", [])) if filters.get("category") else None,
+            "type": [type_map[t] for t in filters.get("type", []) if t in type_map] if filters.get("type") else None,
+            "status": [status_map[s] for s in filters.get("status", []) if s in status_map] if filters.get("status") else None,
+            "start_date": (
+                filters.get("start_date").toString("yyyy-MM-dd")
+                if getattr(filters.get("start_date"), "toString", None)
+                else filters.get("start_date")
+            ),
+            "end_date": (
+                filters.get("end_date").toString("yyyy-MM-dd")
+                if getattr(filters.get("end_date"), "toString", None)
+                else filters.get("end_date")
+            ),
+        }
+        return normalized
+
+    def get_total_of_transactions(self, filters=None):
+         total_income, total_outcome = self._transactions.total(self._normalize_filters_for_query(filters))
          return total_income, total_outcome
     
     def insert_many(self, transactions):

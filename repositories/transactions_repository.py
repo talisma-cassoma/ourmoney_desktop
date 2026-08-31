@@ -194,21 +194,87 @@ class TransactionsRepository:
 
         return [TransactionEntity(*t) for t in transactions]
 
-    def get_total(self):
+    def get_total(self, filters=None):
+        query = """
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'income' THEN price ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN type = 'outcome' THEN price ELSE 0 END), 0)
+            FROM Transactions
+            WHERE status != 'deleted'
+        """
+    
+        params = []
+    
+        if filters:
+            if filters.get("keyword"):
+                query += """
+                    AND (
+                        description LIKE ?
+                        OR category LIKE ?
+                        OR CAST(price AS TEXT) LIKE ?
+                    )
+                """
+    
+                keyword = f"%{filters['keyword']}%"
+                params.extend([keyword, keyword, keyword])
+    
+            if filters.get("category"):
+                query += (
+                    " AND ("
+                    + " OR ".join(
+                        ["category LIKE ?"] * len(filters["category"])
+                    )
+                    + ")"
+                )
+    
+                params.extend(
+                    [f"%{value}%" for value in filters["category"]]
+                )
+    
+            if filters.get("type"):
+                query += (
+                    " AND ("
+                    + " OR ".join(
+                        ["type LIKE ?"] * len(filters["type"])
+                    )
+                    + ")"
+                )
+    
+                params.extend(
+                    [f"%{value}%" for value in filters["type"]]
+                )
+    
+            if filters.get("status"):
+                query += (
+                    " AND ("
+                    + " OR ".join(
+                        ["status LIKE ?"] * len(filters["status"])
+                    )
+                    + ")"
+                )
+    
+                params.extend(
+                    [f"%{value}%" for value in filters["status"]]
+                )
+    
+            if filters.get("start_date"):
+                query += " AND createdAt >= ?"
+                params.append(filters["start_date"])
+    
+            if filters.get("end_date"):
+                query += " AND createdAt < ?"
+                params.append(filters["end_date"])
+    
         with self._connect() as conn:
-            cur = conn.cursor()
-
-            # Query to calculate total incomes
-            cur.execute("SELECT SUM(price) as total_incomes FROM Transactions WHERE status != 'deleted' AND type = 'income'")
-            self.total_income = cur.fetchone()[0] or 0.0  # Default to 0.0 if no income
-
-            # Query to calculate total outcomes
-            cur.execute("SELECT SUM(price) as total_outcomes FROM Transactions WHERE status != 'deleted' AND type = 'outcome'")
-            self.total_outcome = cur.fetchone()[0] or 0.0  # Default to 0.0 if no outcome
-
+            cur = conn.execute(query, params)
+            row = cur.fetchone()
+    
+            self.total_income = row[0]
+            self.total_outcome = row[1]
+    
             return self.total_income, self.total_outcome
-
-#delete methods
+    
+    #delete methods
     def delete_many(self, transaction_ids: list[str]):
         """
         Deleta múltiplas transações no banco de dados local.
@@ -313,58 +379,130 @@ class TransactionsRepository:
 
 
     
-    def search_transactions_by_filters(self, last_date, filters) -> list[TransactionEntity]:
-        
+    def search_transactions_by_filters(
+        self,
+        last_date=None,
+        filters=None
+    ) -> list[TransactionEntity]:
+    
         query = """
-        SELECT id, description, type, category, price, owner, email, status, createdAt
-        FROM Transactions
-        WHERE 1=1 AND status != 'deleted' 
+            SELECT
+                id,
+                description,
+                type,
+                category,
+                price,
+                owner,
+                email,
+                status,
+                createdAt
+            FROM Transactions
+            WHERE status != 'deleted'
         """
+    
         params = []
-
+    
+        # --------------------------------
+        # Keyword
+        # --------------------------------
+    
         if filters.get("keyword"):
-            query += " AND (description LIKE ? OR category LIKE ? OR CAST(price AS TEXT) LIKE ?)"
+            query += """
+                AND (
+                    description LIKE ?
+                    OR category LIKE ?
+                    OR CAST(price AS TEXT) LIKE ?
+                )
+            """
+    
             keyword = f"%{filters['keyword']}%"
             params.extend([keyword, keyword, keyword])
-
+    
+        # --------------------------------
+        # Category
+        # --------------------------------
+    
         if filters.get("category"):
-            query += " AND (" + " OR ".join(["category LIKE ?"] * len(filters["category"])) + ")"
-            params.extend([f"%{val}%" for val in filters["category"]])
-
+            query += (
+                " AND ("
+                + " OR ".join(
+                    ["category LIKE ?"] * len(filters["category"])
+                )
+                + ")"
+            )
+    
+            params.extend(
+                [f"%{value}%" for value in filters["category"]]
+            )
+    
+        # --------------------------------
+        # Type
+        # --------------------------------
+    
         if filters.get("type"):
-            query += " AND (" + " OR ".join(["type LIKE ?"] * len(filters["type"])) + ")"
-            params.extend([f"%{val}%" for val in filters["type"]])
-
+            query += (
+                " AND ("
+                + " OR ".join(
+                    ["type LIKE ?"] * len(filters["type"])
+                )
+                + ")"
+            )
+    
+            params.extend(
+                [f"%{value}%" for value in filters["type"]]
+            )
+    
+        # --------------------------------
+        # Status
+        # --------------------------------
+    
         if filters.get("status"):
-            query += " AND (" + " OR ".join(["status LIKE ?"] * len(filters["status"])) + ")"
-            params.extend([f"%{val}%" for val in filters["status"]])
-
-        if filters.get("year"):
-            query += " AND (" + " OR ".join(["strftime('%Y', createdAt) = ?"] * len(filters["year"])) + ")"
-            params.extend(filters["year"])
-
-        if filters.get("month"):
-            query += " AND (" + " OR ".join(["strftime('%m', createdAt) = ?"] * len(filters["month"])) + ")"
-            params.extend(filters["month"])
-
+            query += (
+                " AND ("
+                + " OR ".join(
+                    ["status LIKE ?"] * len(filters["status"])
+                )
+                + ")"
+            )
+    
+            params.extend(
+                [f"%{value}%" for value in filters["status"]]
+            )
+    
+        # --------------------------------
+        # Período
+        # --------------------------------
+    
+        if filters.get("start_date"):
+            query += " AND createdAt >= ?"
+            params.append(filters["start_date"])
+    
+        if filters.get("end_date"):
+            query += " AND createdAt < ?"
+            params.append(filters["end_date"])
+    
+        # --------------------------------
+        # Paginação
+        # --------------------------------
+    
         if last_date:
             query += " AND createdAt < ?"
             params.append(last_date)
-
-        query += " ORDER BY createdAt DESC LIMIT 20"
-
+    
+        # --------------------------------
+        # Ordenação + limite
+        # --------------------------------
+    
+        query += """
+            ORDER BY createdAt DESC
+            LIMIT 20
+        """
+    
         with self._connect() as conn:
             cursor = conn.execute(query, params)
             transactions = cursor.fetchall()
-            # # Reutiliza os mesmos filtros para calcular os totais
-            # sum_query = """
-            # SELECT SUM(CASE WHEN type = 'income' THEN price ELSE 0 END) as total_income, SUM(CASE WHEN type = 'outcome' THEN price ELSE 0 END) as total_outcome
-            # FROM Transactions
-            # WHERE 1=1
-            # """ + query[query.find("AND"):query.find("ORDER BY")]  # pega todos os filtros do SELECT acima, sem o LIMIT
-            # cursor = conn.execute(sum_query, params[:-1] if last_date else params)  # remove LIMIT param se tiver
-            # row = cursor.fetchone()
-            # self.total_income = row[0] or 0.0
-            # self.total_outcome = row[1] or 0.0
-            
-            return [TransactionEntity(*t) for t in transactions]
+    
+            return [
+                TransactionEntity(*transaction)
+                for transaction in transactions
+            ]

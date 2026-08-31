@@ -131,14 +131,14 @@ class MainWindow(QMainWindow):
             "category": set(),
             "type": set(),
             "status": set(),
-            "year": set(),
-            "month": set(),
+            "start_date": None,
+            "end_date": None,
         }
 
     def set_controller(self, controller):
         """Define o controlador para a GUI."""
         self.controller = controller
-        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions()
+        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
         
         self.initUI()
         
@@ -407,32 +407,34 @@ class MainWindow(QMainWindow):
         )
         fl.addWidget(status_button)
 
-        # Filtro de ano
-        year_button = create_checkbox_menu_button(
-            title = "ano", 
-            options = ["2025", "2024"],
-            selected_options_set = self.filters["year"]
-            )
-        fl.addWidget(year_button)
-
-
-        # Filtro de mes
-        month_button = create_checkbox_menu_button(
-            title="mes", 
-            options = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setempbro", "outubro", "novembro", "dezembro"],
-            selected_options_set = self.filters["month"]
-            )
-        fl.addWidget(month_button)
-
         #Filtro de tipo
         type_filter_button = create_checkbox_menu_button(
             title="tipo", 
             options=["entrada","saida"], 
-             selected_options_set = self.filters["type"]
+            selected_options_set = self.filters["type"]
             )
-        
+                
         fl.addWidget(type_filter_button)
 
+        #Filter start date
+        self.start_date_input = QDateEdit()
+        self.start_date_input.setCalendarPopup(True)
+        self.start_date_input.setDisplayFormat("dd-MM-yyyy")
+        self.start_date_input.setDate(QDate.fromString(today, "dd-MM-yyyy"))
+
+        fl.addWidget(QLabel("De:"))
+        fl.addWidget(self.start_date_input)
+
+        #Filter end date
+        self.end_date_input = QDateEdit()
+        self.end_date_input.setCalendarPopup(True)
+        self.end_date_input.setDisplayFormat("dd-MM-yyyy")
+        self.end_date_input.setDate(QDate.fromString(today, "dd-MM-yyyy"))
+
+        fl.addWidget(QLabel("Até:"))
+        fl.addWidget(self.end_date_input)
+
+       
         self.main_layout.addWidget(self.filter_frame)
 
         # Block 3: List of registered transactions using QTableWidget
@@ -682,8 +684,8 @@ class MainWindow(QMainWindow):
         self.controller.delete_transaction(transaction_id)
         self.last_date = None
 
-        # Recalculate totals
-        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions()
+        # Recalculate totals using the active filter set
+        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
 
         # Format totals with space as a thousands separator
         formatted_income = f"{self.total_of_income:,.2f}".replace(",", " ")
@@ -800,11 +802,34 @@ class MainWindow(QMainWindow):
         self.category_input.clear()
         self.price_input.clear()
 
+    def update_date_filters(self):
+
+        start_date = self.start_date_input.date()
+        end_date = self.end_date_input.date()
+
+        if start_date > end_date:
+            QMessageBox.warning(
+                self,
+                "Período inválido",
+                "A data inicial não pode ser posterior à data final."
+            )
+            return False
+        
+        self.filters["start_date"] = start_date
+        self.filters["end_date"] = end_date
+
+        return True
+
     def update_keyword_filter(self): 
         self.last_date = None
+
         self.filters["keyword"] = self.search_input.text().strip().lower()
-        # Recalculate totals
-        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions()
+
+        if not self.update_date_filters():
+            return
+    
+        # Recalculate totals using the current active filters
+        self.total_of_income, self.total_of_outcome = self.controller.get_total_of_transactions(self.filters)
 
         # Format totals with space as a thousands separator
         formatted_income = f"{self.total_of_income:,.2f}".replace(",", " ")

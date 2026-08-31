@@ -21,8 +21,8 @@ class ListTransactions:
                 "category": [],
                 "type": [],
                 "status": [],
-                "year": "",
-                "month": ""
+                "start_date": "",
+                "end_date": ""
             }
 
 
@@ -32,8 +32,8 @@ class ListTransactions:
             filters["category"] == None and
             filters["type"] == None and
             filters["status"] == None and
-            filters["year"] == None and
-            filters["month"] == None
+            filters["start_date"] == None and
+            filters["end_date"] == None
         )
 
         #print(f"filters: {filters}")
@@ -55,5 +55,8 @@ class ListTransactions:
     def fetch_unsynced(self)-> list[TransactionEntity]:
         return self._repository.get_unsynced_transactions()
     
-    def total(self):return self._repository.total_income, self._repository.total_outcome
+    def total(self, filters=None):
+        if filters is None:
+            return self._repository.get_total()
+        return self._repository.get_total(filters)
     
