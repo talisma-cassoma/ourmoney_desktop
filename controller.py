@@ -19,6 +19,17 @@ from services.import_json_service import import_transactions_from_json
 # Configuração do logging
 logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
+def format_date_filter(value, end_of_day=False):
+     if not value:
+         return None
+     date_value = (
+         value.toString("yyyy-MM-dd")
+         if getattr(value, "toString", None)
+         else str(value).split("T", 1)[0]
+     )
+     time_value = "23:59:59" if end_of_day else "00:00:00"
+     return f"{date_value}T{time_value}"
+
 class ExportServiceFactory:
     """Fábrica para retornar a instância correta do serviço de exportação."""
 
@@ -45,7 +56,7 @@ class Controller:
         self.api_url = "https://our-money-bkd.onrender.com"
         #self.api_url = "http://localhost:3000"
         self.timeout = 10
-    
+  
     def is_online(self):
         """Checa se a máquina está conectada ao servidor."""
         try:
@@ -90,16 +101,8 @@ class Controller:
             "category": list(filters["category"]) if filters["category"] else None,
             "type": [type_map[t] for t in filters["type"] if t in type_map] if filters["type"] else None,
             "status": [status_map[s] for s in filters["status"] if s in status_map] if filters["status"] else None,
-            "start_date": (
-                filters["start_date"].toString("yyyy-MM-dd")
-                if filters.get("start_date")
-                else None
-            ),
-            "end_date": (
-                filters["end_date"].toString("yyyy-MM-dd")
-                if filters.get("end_date")
-                else None
-            ),
+            "start_date": format_date_filter(filters.get("start_date")),
+            "end_date": format_date_filter(filters.get("end_date"), end_of_day=True),
         }
       
         transactions = self._transactions.fetch(last_date=last_date, filters=parsed_filters)
@@ -179,16 +182,8 @@ class Controller:
             "category": list(filters.get("category", [])) if filters.get("category") else None,
             "type": [type_map[t] for t in filters.get("type", []) if t in type_map] if filters.get("type") else None,
             "status": [status_map[s] for s in filters.get("status", []) if s in status_map] if filters.get("status") else None,
-            "start_date": (
-                filters.get("start_date").toString("yyyy-MM-dd")
-                if getattr(filters.get("start_date"), "toString", None)
-                else filters.get("start_date")
-            ),
-            "end_date": (
-                filters.get("end_date").toString("yyyy-MM-dd")
-                if getattr(filters.get("end_date"), "toString", None)
-                else filters.get("end_date")
-            ),
+            "start_date": format_date_filter(filters.get("start_date")),
+            "end_date": format_date_filter(filters.get("end_date"), end_of_day=True),
         }
         return normalized
 
